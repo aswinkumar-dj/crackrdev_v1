@@ -27,46 +27,7 @@ export default function InterviewPage() {
     return `border-[#e4eceb] ${difficultyOption?.tintClass ?? ""} hover:border-[#17a1a6]`;
   };
 
- const getQuestions = async () => {
-  try {
-    const supabase = getSupabase();
 
-    // 🔑 Get current logged-in session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    // ❗ Check if user is logged in
-    if (!session) {
-      console.log("User not logged in");
-      return;
-    }
-
-    const token = session.access_token;
-
-    // 🌐 Call your backend with token
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/questions`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    // ❗ Handle error safely
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Error:", response.status, errorText);
-      return;
-    }
-
-    const questions = await response.json();
-    console.log(questions);
-  } catch (err) {
-    console.error("Fetch failed:", err);
-  }
-};
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#f8fbfb] px-4 py-16 text-[#101616] sm:px-6 lg:px-8">
@@ -127,7 +88,7 @@ export default function InterviewPage() {
         onClose={() => setIsInstructionsOpen(false)}
       />
 
-      <button className="bg-blue-500" onClick={()=>getQuestions()}>Testing</button>
+    
     </div>
   );
 }
