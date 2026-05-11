@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import TestCredentialsCard from '@/app/auth/components/TestCredentialsCard'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -58,6 +59,8 @@ export default function LoginPage() {
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
+
+          <TestCredentialsCard />
 
           <div className="space-y-4">
             <div>
