@@ -10,7 +10,7 @@ export default async function ProtectedLayout({
 
   return (
     <>
-      <AppHeader />
+      
       {children}
     </>
   );

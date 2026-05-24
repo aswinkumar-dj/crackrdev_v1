@@ -12,6 +12,7 @@ import { difficultyOptions, yoeOptions } from "./constants";
 import { useInterviewSetupForm } from "./hooks/useInterviewSetupForm";
 import type { Difficulty } from "./types";
 import { getSupabase } from "@/lib/supabase/client";
+import AppHeader from "@/app/components/AppHeader";
 
 export default function InterviewPage() {
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
@@ -30,6 +31,8 @@ export default function InterviewPage() {
 
 
   return (
+    <>
+    <AppHeader />
     <div className="relative min-h-screen overflow-hidden bg-[#f8fbfb] px-4 py-16 text-[#101616] sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-72 border-b border-[#dcebea] bg-white" />
 
@@ -89,6 +92,6 @@ export default function InterviewPage() {
       />
 
     
-    </div>
+    </div></>
   );
 }

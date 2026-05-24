@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { getSupabase } from '@/lib/supabase/client'
+import AppHeader from '@/app/components/AppHeader'
 
 type ScoreData = {
   overall_score: number
@@ -105,6 +106,7 @@ export default function DashboardPage() {
   const latest = sessions[0] || null
 
   return (
+    <><AppHeader />
     <div className="min-h-screen bg-[#f4fbfb]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
@@ -249,6 +251,6 @@ export default function DashboardPage() {
         </div>
 
       </div>
-    </div>
+    </div></>
   )
 }
