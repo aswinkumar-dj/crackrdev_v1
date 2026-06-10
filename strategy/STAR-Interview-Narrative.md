@@ -1,6 +1,5 @@
 # STAR Method Interview Narrative — CrackrDev
 
-> Ready-to-use narrative for explaining this project during technical interviews. Structured in the classic STAR format (Situation, Task, Action, Result).
 
 ---
 
