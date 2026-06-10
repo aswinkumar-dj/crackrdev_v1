@@ -11,25 +11,6 @@ CrackrDev is a Next.js-based application that simulates technical interview expe
 - Get real-time transcription and feedback
 - Track performance across multiple interview sessions
 
-## ✨ Key Features
-
-> **For interviews**: A complete, ready-to-use **STAR method narrative** (Situation → Task → Action → Result) is available in the repo:
->
-> **[strategy/STAR-Interview-Narrative.md](./strategy/STAR-Interview-Narrative.md)**
-
-This document contains:
-- Detailed architecture and design decisions
-- Step-by-step breakdown of how every major feature was built
-- Key technical choices (libraries, patterns, data flow, tradeoffs)
-- Problems the project solves and how
-- Talking points tailored for technical interviews
-
-## 📁 Interview Strategy Folder
-
-The `strategy/` directory contains materials designed to help you discuss this project effectively:
-
-- `STAR-Interview-Narrative.md` — Full STAR-structured explanation (recommended for most interviews)
-
 ### Interview Customization
 - **8 Role Options**: Frontend, Backend, Full Stack, Android, Data Engineering, Machine Learning, Data Science, DevOps
 - **4 Experience Levels**: Fresher, 1-2 years, 3-5 years, 5+ years
