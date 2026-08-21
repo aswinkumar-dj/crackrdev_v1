@@ -1,7 +1,5 @@
 # STAR Method Interview Narrative — CrackrDev
 
-> Ready-to-use narrative for explaining this project during technical interviews. Structured in the classic STAR format (Situation, Task, Action, Result).
-
 ---
 
 ## Situation
@@ -178,12 +176,3 @@ CrackrDev is a complete, end-to-end vertical slice of an AI-powered interview pr
 The platform is ready for real usage and can be extended (dynamic follow-ups, code editor integration, video analysis, more roles, etc.).
 
 ---
-
-**Files of interest for deeper discussion**:
-- `app/(protected)/interview/[sessionId]/hooks/useRealtimeInterview.ts`
-- `app/api/sessions/start/route.ts` & `complete/route.ts`
-- `app/api/resume/parse/route.ts` & `app/api/transcribe/route.ts`
-- `lib/auth.ts` + `lib/auth-context.tsx`
-- `app/(protected)/dashboard/page.tsx`
-
-Use the sections above selectively depending on the interview focus (architecture, AI integration, frontend state management, product thinking, etc.).
