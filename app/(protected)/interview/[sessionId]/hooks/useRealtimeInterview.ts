@@ -3,15 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { getSupabase } from "@/lib/supabase/client"
 import type { AiStatus, InterviewSessionConfig } from "../types"
+import {
+  cancelInterviewSpeech,
+  speakInterviewLine,
+  waitForInterviewVoice,
+} from "../utils/speech"
 
 type UseRealtimeInterviewOptions = {
   sessionId: string
   session: InterviewSessionConfig
+  enabled: boolean
 }
 
 export function useRealtimeInterview({
   sessionId,
   session,
+  enabled,
 }: UseRealtimeInterviewOptions) {
   const [isMicOn, setIsMicOn] = useState(false)
   const [aiStatus, setAiStatus] = useState<AiStatus>("Processing...")
@@ -26,59 +33,79 @@ export function useRealtimeInterview({
   const streamRef = useRef<MediaStream | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const isEndedRef = useRef(false)
+  const sessionRef = useRef(session)
   const currentQuestion = questions[currentQuestionIndex] || null
 
-  const speak = useCallback((text: string) => {
+  sessionRef.current = session
+
+  const speak = useCallback(async (text: string) => {
     if (isEndedRef.current) return
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 1.0
-    utterance.pitch = 1.0
-    utterance.volume = 1.0
-    setAiStatus("Speaking...")
-    utterance.onend = () => setAiStatus("Listening...")
-    window.speechSynthesis.speak(utterance)
+
+    await speakInterviewLine(text, {
+      isCancelled: () => isEndedRef.current,
+      onStart: () => setAiStatus("Speaking..."),
+      onEnd: () => {
+        if (!isEndedRef.current) setAiStatus("Listening...")
+      },
+    })
   }, [])
 
-  const askQuestion = useCallback((index: number, qs: typeof questions) => {
+  const askQuestion = useCallback(async (index: number, qs: typeof questions) => {
+    if (isEndedRef.current) return
+
     if (index >= qs.length) {
-      speak("That concludes our interview. Thank you for your time. Please click finish interview.")
-      setAiStatus("Processing...")
+      await speak("That concludes our interview. Thank you for your time. Please click finish interview.")
+      if (!isEndedRef.current) setAiStatus("Processing...")
       return
     }
-    const q = qs[index]
-    speak(`Question ${index + 1}: ${q.content}`)
+
     setCurrentQuestionIndex(index)
+    await speak(`Question ${index + 1}: ${qs[index].content}`)
   }, [speak])
 
-  // load questions on mount
   useEffect(() => {
+    void waitForInterviewVoice()
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) return
+
+    let cancelled = false
+
     const loadQuestions = async () => {
       try {
         const supabase = getSupabase()
         const { data: { session: authSession } } = await supabase.auth.getSession()
-        if (!authSession) return
+        if (!authSession || cancelled || isEndedRef.current) return
 
         const res = await fetch(`/api/questions?sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${authSession.access_token}` },
         })
         const data = await res.json()
-        if (data.questions) {
-          setQuestions(data.questions)
-          setIsConnected(true)
-          // greet and ask first question
-          setTimeout(() => {
-            speak(`Hi ${session.name}! Welcome to your ${session.role} mock interview. I'll ask you ${data.questions.length} questions. Take your time to answer each one. Let's begin.`)
-            setTimeout(() => askQuestion(0, data.questions), 4000)
-          }, 500)
-        }
-      } catch (err) {
-        setError("Failed to load interview questions.")
+        if (!data.questions || cancelled || isEndedRef.current) return
+
+        setQuestions(data.questions)
+        setIsConnected(true)
+
+        const { name, role } = sessionRef.current
+        await speak(
+          `Hi ${name}! Welcome to your ${role} mock interview. I'll ask you ${data.questions.length} questions. Take your time to answer each one. Let's begin.`,
+        )
+        if (cancelled || isEndedRef.current) return
+
+        await askQuestion(0, data.questions)
+      } catch {
+        if (!cancelled) setError("Failed to load interview questions.")
       }
     }
 
     void loadQuestions()
-  }, [sessionId, session.name, session.role, speak, askQuestion])
+
+    return () => {
+      cancelled = true
+      cancelInterviewSpeech()
+    }
+  }, [askQuestion, enabled, sessionId, speak])
 
   // setup camera
   useEffect(() => {
@@ -109,7 +136,7 @@ export function useRealtimeInterview({
     } else {
       // start recording
       if (!streamRef.current) return
-      window.speechSynthesis.cancel()
+      cancelInterviewSpeech()
       audioChunksRef.current = []
 
       const mediaRecorder = new MediaRecorder(streamRef.current)
@@ -135,11 +162,12 @@ export function useRealtimeInterview({
           // get AI feedback and next question
           const nextIndex = currentQuestionIndex + 1
           if (nextIndex < questions.length) {
-            speak(`Thank you for your answer. Moving to question ${nextIndex + 1}.`)
-            setTimeout(() => askQuestion(nextIndex, questions), 2000)
+            await speak(`Thank you for your answer. Moving to question ${nextIndex + 1}.`)
+            if (isEndedRef.current) return
+            await askQuestion(nextIndex, questions)
           } else {
-            speak("Great answer! That was the last question. Please click finish interview when you're ready.")
-            setAiStatus("Processing...")
+            await speak("Great answer! That was the last question. Please click finish interview when you're ready.")
+            if (!isEndedRef.current) setAiStatus("Processing...")
           }
         } catch {
           setError("Failed to process your answer. Please try again.")
@@ -153,21 +181,18 @@ export function useRealtimeInterview({
     }
   }, [isMicOn, currentQuestionIndex, questions, speak, askQuestion])
 
+  const endSession = useCallback(() => {
+    if (isEndedRef.current) return
+    isEndedRef.current = true
+    cancelInterviewSpeech()
+    mediaRecorderRef.current?.stop()
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    setIsConnected(false)
+    setIsMicOn(false)
+    setAiStatus("Processing...")
+  }, [])
 
-const endSession = useCallback(() => {
-  if (isEndedRef.current) return
-  isEndedRef.current = true
-  window.speechSynthesis.cancel()
-  mediaRecorderRef.current?.stop()
-  streamRef.current?.getTracks().forEach(t => t.stop())
-  setIsConnected(false)
-  setIsMicOn(false)
-  setAiStatus("Processing...")
-}, [])
-
-  
-
-return {
+  return {
   aiStatus,
   error,
   isConnected,

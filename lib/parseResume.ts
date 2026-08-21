@@ -1,28 +1,43 @@
+import { getSupabase } from "./supabase/client"
+
 export type ParsedResume = {
-  skills: string[];
-  yoe: string;
-  projects: string[];
-  rawText: string;
-};
+  skills: string[]
+  yoe: string
+  projects: string[]
+  rawText: string
+}
 
 export async function parseResume(resumeUrl: string): Promise<ParsedResume> {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
 
   if (!backendUrl) {
-    throw new Error("NEXT_PUBLIC_BACKEND_URL is not configured.");
+    throw new Error("NEXT_PUBLIC_BACKEND_URL is not configured.")
+  }
+
+  const supabase = getSupabase()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session) {
+    throw new Error("Not authenticated")
   }
 
   const response = await fetch(`${backendUrl}/api/resume/parse`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({ resumeUrl }),
-  });
-  const data = await response.json();
-  console.log(data);
+  })
+
+  const data = await response.json()
+  console.log(data)
+
   if (!response.ok) {
-    throw new Error("Failed to parse resume.");
+    throw new Error(data.error || "Failed to parse resume.")
   }
-  return data;
+
+  return data
 }

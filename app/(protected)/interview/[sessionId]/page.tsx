@@ -20,6 +20,7 @@ export default function InterviewRoomPage({
   const { user } = useAuth();
   const [isFinishing, setIsFinishing] = useState(false);
   const [showRedirectNotice, setShowRedirectNotice] = useState(false);
+  const [isSessionReady, setIsSessionReady] = useState(false);
   const [sessionConfig, setSessionConfig] = useState<InterviewSessionConfig>({
     name: user?.email?.split("@")[0] || "Candidate",
     role: "Developer",
@@ -49,6 +50,7 @@ export default function InterviewRoomPage({
             round: data.round_type || "technical",
             difficulty: data.difficulty,
           });
+          setIsSessionReady(true);
         } else {
           router.replace("/dashboard");
         }
@@ -76,6 +78,7 @@ export default function InterviewRoomPage({
   } = useRealtimeInterview({
     sessionId,
     session: sessionConfig,
+    enabled: isSessionReady,
   });
 
   const handleFinishInterview = async () => {

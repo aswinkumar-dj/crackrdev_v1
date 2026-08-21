@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import Groq from "groq-sdk"
 import { adminSupabase } from "@/lib/supabase/admin"
 import { getRequestUser } from "@/lib/auth"
+import { GROQ_MODELS, groq, parseModelJson } from "@/lib/groq"
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+type InterviewScores = {
+  overallScore: number
+  communicationScore: number
+  technicalScore: number
+  confidenceScore: number
+  feedback: string
+  strengths: string[]
+  areasToImprove: string[]
+}
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
     const { sessionId } = await params
@@ -30,11 +38,14 @@ export async function POST(
     }
 
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODELS.quality,
+      reasoning_effort: "low",
+      temperature: 0.3,
       messages: [
         {
           role: "system",
-          content: "You are a technical interview evaluator. Return ONLY valid JSON. No markdown, no backticks.",
+          content:
+            "You are a technical interview evaluator. Score the candidate from the actual answers given. Return valid JSON.",
         },
         {
           role: "user",
@@ -44,24 +55,49 @@ Difficulty: ${difficulty}
 Questions asked: ${questions?.join(", ")}
 Candidate transcript: ${transcript || "No answer provided"}
 
-Score the candidate honestly from 0-100 based on their actual responses.
-Return ONLY this JSON with no other text:
-{
-  "overallScore": <number 0-100>,
-  "communicationScore": <number 0-100>,
-  "technicalScore": <number 0-100>,
-  "confidenceScore": <number 0-100>,
-  "feedback": "<2-3 sentence overall feedback>",
-  "strengths": ["<specific strength 1>", "<specific strength 2>"],
-  "areasToImprove": ["<specific area 1>", "<specific area 2>"]
-}`,
+Score the candidate honestly from 0-100 based on their actual responses.`,
         },
       ],
-      temperature: 0.3,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "interview_scores",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              overallScore: { type: "number" },
+              communicationScore: { type: "number" },
+              technicalScore: { type: "number" },
+              confidenceScore: { type: "number" },
+              feedback: { type: "string" },
+              strengths: {
+                type: "array",
+                items: { type: "string" },
+              },
+              areasToImprove: {
+                type: "array",
+                items: { type: "string" },
+              },
+            },
+            required: [
+              "overallScore",
+              "communicationScore",
+              "technicalScore",
+              "confidenceScore",
+              "feedback",
+              "strengths",
+              "areasToImprove",
+            ],
+            additionalProperties: false,
+          },
+        },
+      },
     })
 
-    const rawText = completion.choices[0].message.content || "{}"
-    const scores = JSON.parse(rawText)
+    const scores = parseModelJson<InterviewScores>(
+      completion.choices[0]?.message?.content,
+    )
 
     const { error: updateError } = await adminSupabase
       .from("sessions")
@@ -92,7 +128,6 @@ Return ONLY this JSON with no other text:
       scores,
       savedAt: new Date().toISOString(),
     })
-
   } catch (error) {
     console.error("[/api/sessions/complete]", error)
     const message = error instanceof Error ? error.message : "Internal server error"

@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
-import Groq from "groq-sdk"
 import { adminSupabase } from "@/lib/supabase/admin"
 import { getRequestUser } from "@/lib/auth"
+import { GROQ_MODELS, groq, parseModelJson } from "@/lib/groq"
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+type GeneratedQuestion = {
+  content: string
+  category: string
+}
+
+type GeneratedQuestionsPayload = {
+  questions: GeneratedQuestion[]
+}
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getRequestUser(req)
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    // 2. parse body
     const { role, difficulty, roundtype, resumeUrl, resumeData } = await req.json()
 
-    // 3. insert session
     const { data: session, error: sessionError } = await adminSupabase
       .from("sessions")
       .insert({
@@ -29,13 +34,15 @@ export async function POST(req: NextRequest) {
 
     if (sessionError) throw sessionError
 
-    // 4. generate questions via Groq
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODELS.quality,
+      reasoning_effort: "low",
+      temperature: 0.7,
       messages: [
         {
           role: "system",
-          content: "You are a technical interviewer. Return ONLY valid JSON array. No markdown, no explanation, no backticks.",
+          content:
+            "You are a technical interviewer. Generate interview questions tailored to the candidate. Return valid JSON.",
         },
         {
           role: "user",
@@ -43,22 +50,45 @@ export async function POST(req: NextRequest) {
 Difficulty: ${difficulty}
 Experience: ${resumeData.yoe}
 Skills: ${resumeData.skills.join(", ")}
-Projects: ${resumeData.projects.join(", ")}
-
-Return ONLY this JSON format:
-[{ "content": "question text here", "category": "category name here" }]`,
+Projects: ${resumeData.projects.join(", ")}`,
         },
       ],
-      temperature: 0.7,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "interview_questions",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              questions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    content: { type: "string" },
+                    category: { type: "string" },
+                  },
+                  required: ["content", "category"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["questions"],
+            additionalProperties: false,
+          },
+        },
+      },
     })
 
-    const rawText = completion.choices[0].message.content || "[]"
-    const questions = JSON.parse(rawText) as Array<{
-      content: string
-      category: string
-    }>
+    const { questions } = parseModelJson<GeneratedQuestionsPayload>(
+      completion.choices[0]?.message?.content,
+    )
 
-    // 5. insert questions
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error("Model did not return any interview questions.")
+    }
+
     const { data: insertedQuestions, error: qError } = await adminSupabase
       .from("questions")
       .insert(
@@ -67,26 +97,22 @@ Return ONLY this JSON format:
           difficulty,
           content: q.content,
           category: q.category,
-        }))
+        })),
       )
       .select("id")
 
     if (qError) throw qError
 
-    // store questionIds in session row
-await adminSupabase
-  .from("sessions")
-  .update({ question_ids: insertedQuestions.map((q) => q.id) })
-  .eq("id", session.id)
+    await adminSupabase
+      .from("sessions")
+      .update({ question_ids: insertedQuestions.map((q) => q.id) })
+      .eq("id", session.id)
 
-return NextResponse.json({
-  sessionId: session.id,
-  startedAt: session.started_at,
-  questionIds: insertedQuestions.map((q) => q.id),
-})
-
-  
-
+    return NextResponse.json({
+      sessionId: session.id,
+      startedAt: session.started_at,
+      questionIds: insertedQuestions.map((q) => q.id),
+    })
   } catch (error) {
     console.error("[/api/sessions/start]", error)
     const message = error instanceof Error ? error.message : "Internal server error"

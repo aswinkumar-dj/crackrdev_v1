@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import Groq from "groq-sdk"
 import { getRequestUser } from "@/lib/auth"
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+import { GROQ_MODELS, groq } from "@/lib/groq"
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const transcription = await groq.audio.transcriptions.create({
       file: audioFile,
-      model: "whisper-large-v3",
+      model: GROQ_MODELS.transcribe,
       language: "en",
     })
 
