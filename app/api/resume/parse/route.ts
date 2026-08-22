@@ -1,3 +1,5 @@
+import "pdf-parse/worker"
+
 import { NextRequest, NextResponse } from "next/server"
 import { PDFParse } from "pdf-parse"
 import { getRequestUser } from "@/lib/auth"
@@ -38,12 +40,26 @@ export async function POST(req: NextRequest) {
 
     const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer())
 
-    console.log("[/api/resume/parse] PDF downloaded:", pdfBuffer.length, "bytes")
+   console.log(
+  "[/api/resume/parse] PDF downloaded:",
+  pdfBuffer.length,
+  "bytes",
+  "content-type:",
+  pdfResponse.headers.get("content-type"),
+)
+
+console.log("[/api/resume/parse] Creating PDF parser...")
 
     const parser = new PDFParse({ data: pdfBuffer })
 
+    console.log("[/api/resume/parse] PDF parser created")
+
+
     try {
+
+      console.log("[/api/resume/parse] Extracting PDF text...")
       const result = await parser.getText()
+      console.log("[/api/resume/parse] PDF text extracted")
       const resumeText = result.text?.trim() ?? ""
 
       console.log("[/api/resume/parse] Resume text length:", resumeText.length)
